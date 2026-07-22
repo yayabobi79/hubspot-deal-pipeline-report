@@ -125,6 +125,73 @@ user or repeat the token back -- only confirm existence/non-emptiness.
    screen to add it (same screen, Scopes tab, same search-and-check
    process).
 
+6. After showing the chat summary, offer: "Want me to also put together a
+   deeper channel-performance analysis as a shareable report, with
+   recommendations?" If yes, follow "Building the channel-performance
+   artifact" below. Artifacts are private by default, so building one
+   doesn't need the same confirmation as posting to Slack -- but **never
+   post the result to Slack from this on-demand flow without asking
+   first**; that's a separate, explicit yes.
+
+## Building the channel-performance artifact
+
+Used by both the on-demand flow (on request) and the scheduled weekly flow
+(automatically, since that's already an approved standing automation).
+
+1. **Get structured data**, not the text report:
+   ```
+   python3 scripts/deal_pipeline_report.py --pipeline "<pipeline>" [--stages "..."] [--sources "..."] --format json
+   ```
+   (or `--use-config --format json` in the scheduled flow). This gives
+   `by_source_total`, `by_source_avg`, `by_source_count`,
+   `by_source_outcome` (won/lost/open amounts per source, derived from
+   HubSpot's own stage-probability metadata -- not label guessing), plus
+   the existing source/detail/stage/owner breakdowns.
+
+2. **Analyze, don't just restate the numbers:**
+   - Rank sources by total pipeline value AND separately by average deal
+     size -- these tell different stories (a channel can have a small
+     total but a high average, meaning fewer but bigger deals).
+   - Where a source has enough closed deals to be meaningful (won + lost
+     > 0), compute a win-rate-style split: won / (won + lost). Don't
+     compute this for sources that are almost entirely still "open" --
+     say so instead of presenting a misleading ratio from a tiny sample.
+   - Call out the "(no source)" / "(no detail)" buckets as a data-quality
+     finding, not just another row -- untracked source data is itself an
+     actionable finding (fix attribution before over-trusting the rest).
+   - **On costs: there is no spend/cost-per-lead data in HubSpot deals.**
+     Do not invent cost figures or ROI numbers. Clearly separate
+     "what the data shows" (deal value and win-rate by channel) from
+     "directional recommendations" (e.g. suggesting which channels look
+     worth leaning into based on value + win-rate, and recommending the
+     team start tracking a cost-per-channel property so a future report
+     can actually quantify cost efficiency). Label the cost-related
+     section as directional, not data-driven.
+
+3. **Write the recommendations in the voice of an experienced B2B
+   marketing/sales professional** -- specific and opinionated (e.g. "double
+   down on X," "investigate why Y converts poorly despite volume"), not
+   generic filler like "continue monitoring performance." Ground every
+   claim in the actual numbers from step 1; flag explicitly anywhere
+   you're being directional rather than data-backed.
+
+4. **Build the artifact.** Load the `artifact-design` skill before writing
+   any HTML (required before using the Artifact tool), and the `dataviz`
+   skill before building any chart (e.g. a bar chart of total or average
+   deal size by source). Include: headline stats, the chart, a source
+   performance table (total, average, win-rate where meaningful), and the
+   written analysis/recommendations section with the cost caveat visible.
+
+5. **Reuse the same artifact URL across runs** instead of minting a new
+   link every time (weekly reports should update one stable link, not
+   scatter a new URL each Monday). Before publishing, call the Artifact
+   tool with `action: "list"` and look for a prior one from this skill
+   (e.g. titled `hubspot_deal_pipeline_analysis`); if found, publish with
+   that `url` to update it in place. Otherwise publish fresh.
+
+6. Return the artifact URL to whoever needs it -- shown in chat for
+   on-demand use, included in the Slack message for the scheduled flow.
+
 ## Setting up automatic weekly delivery (Slack)
 
 Trigger this when the user asks for the report to run "automatically",
@@ -179,19 +246,30 @@ scheduled run has no memory of this conversation) along these lines:
 Generate this week's HubSpot deal pipeline report and post it to Slack.
 This is an unattended scheduled run -- follow these steps exactly.
 
-1. Run: python3 <absolute path to>/scripts/deal_pipeline_report.py --use-config
+1. Run: python3 <absolute path to>/scripts/deal_pipeline_report.py --use-config --format json
    (reads the token from ~/HubSpotToken/token.txt, falling back to
    HUBSPOT_ACCESS_TOKEN; reads saved scope from ~/HubSpotDealReport/config.json)
 2. If it fails (missing token/config, HubSpot API error, missing scopes),
    don't try to fix it -- post a short message to <channel> explaining the
    weekly report failed, with the exact error, so a human can fix setup.
-3. If it succeeds, reformat the plain-text output into a clean Slack
-   message: headline deal count/total, then source > detail > stage
-   breakdown, then owner totals. Don't paste raw output verbatim.
-4. Post that summary to <channel> using the Slack send-message tool
-   (search for it via ToolSearch if not already loaded).
+   Stop here.
+3. If it succeeds, follow "Building the channel-performance artifact" in
+   this skill's SKILL.md: analyze the JSON output (value and average deal
+   size by source, win-rate where the sample supports it, data-quality
+   gaps), write recommendations in the voice of an experienced B2B
+   marketing/sales professional, clearly separating data-backed
+   observations from directional cost-related suggestions (no spend data
+   exists), and publish/update the artifact (reuse the existing
+   `hubspot_deal_pipeline_analysis` artifact URL via `action: "list"`
+   rather than minting a new link).
+4. Post to <channel> using the Slack send-message tool: a clean summary
+   (headline deal count/total, then source > detail > stage breakdown,
+   then owner totals -- not raw script output) followed by the artifact
+   URL from step 3.
 5. This is unattended -- don't ask clarifying questions. If the Slack
-   post itself fails, note that in the completion summary.
+   post itself fails, note that in the completion summary. If the
+   artifact step fails but the report data is fine, still post the Slack
+   summary without the link rather than failing the whole run.
 ```
 
 **9. Tell the user** that the very first scheduled run may pause on a

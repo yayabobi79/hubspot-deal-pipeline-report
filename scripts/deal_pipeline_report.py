@@ -108,6 +108,21 @@ def resolve_stages(pipeline, stage_queries):
     return resolved
 
 
+def stage_outcome(stage):
+    """Classify a stage as won/lost/open using HubSpot's own stage metadata
+    (isClosed + probability), so this works across any pipeline regardless
+    of how stages happen to be labeled."""
+    metadata = stage.get("metadata") or {}
+    is_closed = str(metadata.get("isClosed", "")).strip().lower() == "true"
+    if not is_closed:
+        return "open"
+    try:
+        probability = float(metadata.get("probability", 0))
+    except (TypeError, ValueError):
+        probability = 0.0
+    return "won" if probability >= 0.999 else "lost"
+
+
 def current_quarter_range(today=None):
     today = today or datetime.date.today()
     quarter = (today.month - 1) // 3
@@ -178,12 +193,14 @@ def fetch_owners(token):
     return owners
 
 
-def build_report(deals, owners, stage_labels_by_id, source_filter):
+def build_report(deals, owners, stage_labels_by_id, stage_outcome_by_id, source_filter):
     source_filter_norm = {s.strip().lower() for s in source_filter} if source_filter else None
 
     by_source_detail_stage = {}
     by_source_detail_total = {}
     by_source_total = {}
+    by_source_count = {}
+    by_source_outcome = {}
     by_owner_total = {}
     grand_total = 0.0
 
@@ -194,6 +211,7 @@ def build_report(deals, owners, stage_labels_by_id, source_filter):
         source_detail = props.get(SOURCE_DETAIL_PROPERTY) or "(no detail)"
         stage_id = props.get("dealstage")
         stage_label = stage_labels_by_id.get(stage_id, stage_id or "(no stage)")
+        outcome = stage_outcome_by_id.get(stage_id, "open")
         owner_id = props.get("hubspot_owner_id")
         owner_name = owners.get(owner_id, "(unassigned)") if owner_id else "(unassigned)"
 
@@ -205,13 +223,23 @@ def build_report(deals, owners, stage_labels_by_id, source_filter):
         by_source_detail_total.setdefault(source, {}).setdefault(source_detail, 0.0)
         by_source_detail_total[source][source_detail] += amount
         by_source_total[source] = by_source_total.get(source, 0.0) + amount
+        by_source_count[source] = by_source_count.get(source, 0) + 1
+        by_source_outcome.setdefault(source, {"won": 0.0, "lost": 0.0, "open": 0.0})
+        by_source_outcome[source][outcome] += amount
         by_owner_total[owner_name] = by_owner_total.get(owner_name, 0.0) + amount
         grand_total += amount
+
+    by_source_avg = {
+        source: total / by_source_count[source] for source, total in by_source_total.items()
+    }
 
     return {
         "by_source_detail_stage": by_source_detail_stage,
         "by_source_detail_total": by_source_detail_total,
         "by_source_total": by_source_total,
+        "by_source_count": by_source_count,
+        "by_source_avg": by_source_avg,
+        "by_source_outcome": by_source_outcome,
         "by_owner_total": by_owner_total,
         "grand_total": grand_total,
         "deal_count": sum(1 for d in deals if _passes_source_filter(d, source_filter_norm)),
@@ -248,6 +276,15 @@ def format_report(report, pipeline_label, start, end, date_field):
     lines.append("## By owner")
     for owner, amount in sorted(report["by_owner_total"].items(), key=lambda kv: -kv[1]):
         lines.append(f"- {owner}: {amount:,.2f}")
+    lines.append("")
+    lines.append("## Source performance (avg deal size, won/lost/open amount)")
+    for source, avg in sorted(report["by_source_avg"].items(), key=lambda kv: -kv[1]):
+        count = report["by_source_count"][source]
+        outcome = report["by_source_outcome"][source]
+        lines.append(
+            f"- {source}: avg {avg:,.2f} across {count} deals "
+            f"(won {outcome['won']:,.2f}, lost {outcome['lost']:,.2f}, open {outcome['open']:,.2f})"
+        )
     return "\n".join(lines)
 
 
@@ -298,6 +335,12 @@ def main():
         action="store_true",
         help="Load pipeline/stages/sources/date-field from --config-file instead of the --pipeline/--stages/--sources/--date-field flags. For unattended runs.",
     )
+    parser.add_argument(
+        "--format",
+        default="text",
+        choices=["text", "json"],
+        help="text (default) for a human-readable report, json for the raw structured data (e.g. to build an analysis or artifact from).",
+    )
     args = parser.parse_args()
 
     token = resolve_token(args.token_env, args.token_file)
@@ -333,6 +376,7 @@ def main():
     stages = resolve_stages(pipeline, stage_queries)
     stage_ids = [s["id"] for s in stages]
     stage_labels_by_id = {s["id"]: s["label"] for s in pipeline["stages"]}
+    stage_outcome_by_id = {s["id"]: stage_outcome(s) for s in pipeline["stages"]}
 
     source_filter = [s for s in sources_raw.split(",") if s.strip()]
 
@@ -361,8 +405,21 @@ def main():
     deals = fetch_deals(token, pipeline["id"], stage_ids, date_field, start, end)
     owners = fetch_owners(token)
 
-    report = build_report(deals, owners, stage_labels_by_id, source_filter)
-    print(format_report(report, pipeline["label"], start, end, date_field))
+    report = build_report(deals, owners, stage_labels_by_id, stage_outcome_by_id, source_filter)
+
+    if args.format == "json":
+        print(json.dumps(
+            {
+                **report,
+                "pipeline_label": pipeline["label"],
+                "quarter_start": start.isoformat(),
+                "quarter_end": end.isoformat(),
+                "date_field": date_field,
+            },
+            indent=2,
+        ))
+    else:
+        print(format_report(report, pipeline["label"], start, end, date_field))
 
 
 if __name__ == "__main__":

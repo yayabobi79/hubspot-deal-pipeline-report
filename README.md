@@ -1,8 +1,11 @@
 # HubSpot deal pipeline report (Claude skill)
 
 Generates a current-quarter HubSpot deal pipeline report broken down by
-deal source, source detail, and stage, plus totals by deal owner. Runs as
-an on-demand Claude skill; no HubSpot MCP connector required.
+deal source, source detail, and stage, plus totals by deal owner. Can also
+produce a channel-performance analysis artifact (which sources bring
+higher-value deals, which convert better, directional recommendations)
+and/or deliver both on a weekly Slack schedule. Runs as an on-demand Claude
+skill; no HubSpot MCP connector required.
 
 ## Setup
 
@@ -83,6 +86,31 @@ quarter). Use `createdate` for deals opened this quarter instead.
   `hs_analytics_source_data_1` properties. If your team tracks deal source
   via a custom property instead, that requires changing the
   `SOURCE_PROPERTY` / `SOURCE_DETAIL_PROPERTY` constants in the script.
+- Win/lost/open classification uses HubSpot's own stage metadata
+  (`isClosed` + `probability`), not label text-matching, so it works
+  regardless of what your stages happen to be named.
+
+## Channel-performance analysis artifact
+
+Add `--format json` to get structured data (`by_source_total`,
+`by_source_avg`, `by_source_count`, `by_source_outcome` with won/lost/open
+amounts per source) instead of the human-readable text report:
+
+```bash
+python3 scripts/deal_pipeline_report.py --pipeline "Your Pipeline Name" --format json
+```
+
+Ask Claude for "a deeper channel analysis" or "a report on what's working"
+and it'll turn this into a shareable artifact: which sources bring
+higher-value deals vs. lower, which convert better where the sample is
+large enough to mean anything, data-quality gaps (e.g. untracked source),
+and recommendations written from a B2B marketing/sales perspective.
+
+**Important limitation:** HubSpot deal records don't include marketing
+spend or cost-per-lead. Any "reduce costs" guidance is necessarily
+directional (e.g., "start tracking cost per channel") rather than backed
+by real cost numbers — the skill labels these separately from the
+data-grounded value/win-rate findings rather than inventing ROI figures.
 
 ## Weekly automatic delivery (Slack)
 
@@ -111,7 +139,11 @@ time. For unattended weekly delivery instead:
 4. **Ask Claude to set it up** ("send this to Slack every Monday morning")
    — the skill will ask which channel, confirm the schedule with you
    before creating anything, and register a scheduled task that runs
-   `deal_pipeline_report.py --use-config` and posts the formatted result to
+   `deal_pipeline_report.py --use-config`, builds the channel-performance
+   artifact, and posts both the formatted summary and the artifact link to
    Slack. The first run may pause on a one-time permission prompt (for
-   Bash + the Slack tool) — running it once manually via "Run now" in the
-   Scheduled section avoids that stalling the real first scheduled fire.
+   Bash, the Slack tool, and the Artifact tool) — running it once manually
+   via "Run now" in the Scheduled section avoids that stalling the real
+   first scheduled fire.
+5. **The artifact link stays stable across weeks** — each run updates the
+   same published page rather than posting a new URL every Monday.
