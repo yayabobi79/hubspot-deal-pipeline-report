@@ -1,4 +1,4 @@
-# HubSpot deal pipeline report (Claude skill)
+# HubSpot weekly deal pipeline report
 
 Generates a current-quarter HubSpot deal pipeline report broken down by
 deal source, source detail, and stage, plus totals by deal owner. Can also
