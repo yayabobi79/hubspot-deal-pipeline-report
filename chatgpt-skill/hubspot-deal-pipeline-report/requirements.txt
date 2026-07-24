@@ -1,0 +1,2 @@
+# No external dependencies -- scripts/deal_pipeline_report.py uses only
+# the Python standard library (argparse, datetime, json, os, sys, urllib).

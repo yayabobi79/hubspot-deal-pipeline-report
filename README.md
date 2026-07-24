@@ -1,13 +1,26 @@
 # HubSpot weekly deal pipeline report
 
 Generates a current-quarter HubSpot deal pipeline report broken down by
-deal source, source detail, and stage, plus totals by deal owner. Can also
-produce a channel-performance analysis artifact (which sources bring
-higher-value deals, which convert better, directional recommendations)
-and/or deliver both on a weekly Slack schedule. Runs as an on-demand Claude
-skill; no HubSpot MCP connector required.
+deal source, source detail, and stage, plus totals by deal owner, with a
+channel-performance analysis (which sources bring higher-value deals,
+which convert better, directional recommendations).
 
-## Setup
+Available for two platforms:
+
+- **Claude** (this root folder) -- full feature set: on-demand reporting,
+  the analysis artifact, and weekly automated Slack delivery via a
+  scheduled task.
+- **ChatGPT** ([`chatgpt-skill/`](chatgpt-skill/)) -- on-demand reporting
+  and the analysis only, packaged as `hubspot-deal-pipeline-report.zip`
+  per [ChatGPT's Skills format](https://help.openai.com/en/articles/20001066-skills-in-chatgpt).
+  Doesn't include Slack/scheduling -- see that folder's README for why and
+  for platform-specific caveats (token persistence, network access).
+
+Both use the exact same underlying script
+(`scripts/deal_pipeline_report.py`), which is plain Python standard
+library with no platform-specific dependencies.
+
+## Setup (Claude)
 
 ### 1. Create a HubSpot private app token
 
