@@ -202,3 +202,5 @@ time. For unattended weekly delivery instead:
    first scheduled fire.
 5. **The artifact link stays stable across weeks** — each run updates the
    same published page rather than posting a new URL every Monday.
+
+**Skill by [mvpGrow](https://mvpgrow.com).** 
