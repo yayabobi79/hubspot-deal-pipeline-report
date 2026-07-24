@@ -22,6 +22,24 @@ library with no platform-specific dependencies.
 
 ## Setup (Claude)
 
+Claude can reach your HubSpot data two ways — ask the skill and it'll walk
+you through picking one if neither is set up yet:
+
+| | Option A: private app + token | Option B: HubSpot connector |
+|---|---|---|
+| Setup | Create a HubSpot private app, copy a token (~5 min) | Connect HubSpot to Claude once (standard OAuth), or skip this if already connected |
+| Works without any pre-existing Claude/HubSpot connection | Yes | No — depends on the connector being authorized for the account |
+| Win/lost classification | Automatic, from HubSpot's own stage metadata | Manual — you tell it once which stages mean "won"/"lost" |
+| Works on the ChatGPT version too | Yes | No — Claude-only |
+| Validated for scheduled/weekly runs | Yes | Not yet — untested for unattended runs |
+
+If you're unsure, Option A is the safer default, especially if you might
+ever use the ChatGPT version or want scheduled delivery. Option B is worth
+it mainly if HubSpot is already connected to your Claude account for other
+things and you don't want a second credential to manage.
+
+### Option A: private app + token
+
 ### 1. Create a HubSpot private app token
 
 In your HubSpot account: **Settings → Integrations → Private Apps → Create
@@ -66,6 +84,23 @@ Clone or copy this folder into your Claude skills directory, e.g.:
 ```bash
 cp -r hubspot-deal-pipeline-report ~/.claude/skills/hubspot-deal-pipeline-report
 ```
+
+### Option B: HubSpot connector
+
+Skip Option A's steps above entirely. Instead:
+
+1. Make sure HubSpot is connected to your Claude account (Claude's
+   connector settings, or `claude mcp`/`/mcp` in an interactive session).
+2. Ask the skill to use the connector — it'll ask which pipeline, and
+   which stage(s) count as "Closed Won"/"Closed Lost" (there's no
+   automatic way to detect this without the private app's pipeline
+   metadata access, so this is a one-time manual mapping instead).
+3. That's it — no token file, no `scripts/` invocation for this path; the
+   skill queries HubSpot directly through the connector's own tools.
+
+This path hasn't been validated against real account data the way Option
+A's script was, and isn't recommended for scheduled/weekly delivery yet
+(see below).
 
 ## Usage
 
@@ -126,6 +161,13 @@ by real cost numbers — the skill labels these separately from the
 data-grounded value/win-rate findings rather than inventing ROI figures.
 
 ## Weekly automatic delivery (Slack)
+
+**Use Option A (private app + token) for this.** It's the path that's
+been run end-to-end as a live scheduled task and confirmed working.
+Option B (connector) is untested for unattended runs — the first
+scheduled run would be the real test of whether the connector's
+authorization and the saved won/lost mapping actually survive a fresh,
+unattended session.
 
 The interactive flow above requires someone to ask for the report each
 time. For unattended weekly delivery instead:
