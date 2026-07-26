@@ -7,9 +7,12 @@ which convert better, directional recommendations).
 
 Available for two platforms:
 
-- **Claude** (this root folder) -- full feature set: on-demand reporting,
-  the analysis artifact, and weekly automated Slack delivery via a
-  scheduled task.
+- **Claude** -- full feature set: on-demand reporting, the analysis
+  artifact, and weekly automated Slack delivery via a scheduled task.
+  Easiest install: [`claude-skill/hubspot-deal-pipeline-report.zip`](claude-skill/)
+  -- upload it in Claude's web app, no terminal needed (see that folder's
+  README). Technical users can instead copy the root folder directly into
+  `~/.claude/skills/` -- see "Setup (Claude)" below.
 - **ChatGPT** ([`chatgpt-skill/`](chatgpt-skill/)) -- on-demand reporting
   and the analysis only, packaged as `hubspot-deal-pipeline-report.zip`
   per [ChatGPT's Skills format](https://help.openai.com/en/articles/20001066-skills-in-chatgpt).
@@ -79,7 +82,12 @@ file.
 
 ### 3. Install the skill
 
-Clone or copy this folder into your Claude skills directory, e.g.:
+**No terminal, easiest:** download [`claude-skill/hubspot-deal-pipeline-report.zip`](claude-skill/)
+and upload it at claude.ai under **Customize → Skills → + → Create skill →
+Upload a skill**. Full walkthrough in [`claude-skill/README.md`](claude-skill/README.md).
+
+**Comfortable with a terminal:** clone or copy this folder into your
+Claude skills directory instead:
 
 ```bash
 cp -r hubspot-deal-pipeline-report ~/.claude/skills/hubspot-deal-pipeline-report
